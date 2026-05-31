@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: shortlinkops
+
+  datasource:
+    url: "${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/shortlink?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}"
+    username: "${SPRING_DATASOURCE_USERNAME:shortlink}"
+    password: "${SPRING_DATASOURCE_PASSWORD:shortlink_pw}"
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.fhwang.shortlinkops.domain
+  configuration:
+    map-underscore-to-camel-case: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+shortlinkops:
+  base-url: "${SHORTLINKOPS_BASE_URL:http://localhost:8080}"
