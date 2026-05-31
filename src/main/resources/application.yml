@@ -3,9 +3,9 @@ spring:
     name: shortlinkops
 
   datasource:
-    url: "${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/shortlink?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}"
-    username: "${SPRING_DATASOURCE_USERNAME:shortlink}"
-    password: "${SPRING_DATASOURCE_PASSWORD:shortlink_pw}"
+    url: "${SPRING_DATASOURCE_URL}"
+    username: "${SPRING_DATASOURCE_USERNAME}"
+    password: "${SPRING_DATASOURCE_PASSWORD}"
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   sql:
@@ -22,8 +22,27 @@ mybatis:
 management:
   endpoints:
     web:
+      base-path: /actuator
       exposure:
         include: health,info
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+  health:
+    redis:
+      enabled: false
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: shortlinkops
+    description: ShortLinkOps URL shortener backend
+    version: "${APP_VERSION:local}"
+    java-version: "17"
 
 shortlinkops:
   base-url: "${SHORTLINKOPS_BASE_URL:http://localhost:8080}"
