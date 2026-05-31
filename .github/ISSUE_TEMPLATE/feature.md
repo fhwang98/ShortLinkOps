@@ -2,9 +2,8 @@
 name: Feature
 about: 새로운 기능 구현 작업
 title: "[Feature] "
-labels: feature
-assignees: fhwang98
-
+labels: "feature"
+assignees: "fhwang98"
 ---
 
 ## 작업 목적

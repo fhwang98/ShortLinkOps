@@ -1,16 +1,9 @@
-# Compiled class file
+# =========================================================
+# Java
+# =========================================================
 *.class
 
-# Log file
-*.log
-
-# BlueJ files
-*.ctxt
-
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
-
-# Package Files #
+# Package files
 *.jar
 *.war
 *.nar
@@ -19,6 +12,129 @@
 *.tar.gz
 *.rar
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+# JVM crash logs
 hs_err_pid*
 replay_pid*
+
+# =========================================================
+# Gradle
+# =========================================================
+.gradle/
+build/
+
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# =========================================================
+# Spring Boot
+# =========================================================
+HELP.md
+
+# Local application config
+application-local.yml
+application-local.yaml
+application-dev.yml
+application-dev.yaml
+application-prod.yml
+application-prod.yaml
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# =========================================================
+# Logs
+# =========================================================
+*.log
+logs/
+
+# =========================================================
+# Docker / Runtime local data
+# =========================================================
+docker-data/
+mysql-data/
+redis-data/
+
+# =========================================================
+# macOS
+# =========================================================
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Icon must end with two \\r
+Icon
+
+# Thumbnails
+._*
+
+# Files that might appear on external disks
+.Spotlight-V100
+.Trashes
+
+# =========================================================
+# IntelliJ IDEA
+# =========================================================
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+# =========================================================
+# VS Code
+# =========================================================
+.vscode/
+
+# If you want to share recommended VS Code settings later,
+# remove .vscode/ above and ignore only local files:
+# .vscode/*
+# !.vscode/settings.json
+# !.vscode/extensions.json
+
+# =========================================================
+# STS / Eclipse
+# =========================================================
+.apt_generated/
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+bin/
+
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+# =========================================================
+# NetBeans
+# =========================================================
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# =========================================================
+# BlueJ
+# =========================================================
+*.ctxt
+
+# =========================================================
+# Mobile Tools for Java (J2ME)
+# =========================================================
+.mtj.tmp/
+
+# =========================================================
+# Temporary files
+# =========================================================
+*.tmp
+*.temp
+*.swp
+*.swo
