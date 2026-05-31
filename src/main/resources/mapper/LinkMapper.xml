@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.fhwang.shortlinkops.mapper.LinkMapper">
+
+    <resultMap id="LinkResultMap" type="Link">
+        <id property="id" column="id"/>
+        <result property="originalUrl" column="original_url"/>
+        <result property="shortCode" column="short_code"/>
+        <result property="clickCount" column="click_count"/>
+        <result property="expiresAt" column="expires_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="Link" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO links (
+            original_url,
+            short_code,
+            expires_at
+        ) VALUES (
+            #{originalUrl},
+            #{shortCode},
+            #{expiresAt}
+        )
+    </insert>
+
+    <select id="findByShortCode" parameterType="string" resultMap="LinkResultMap">
+        SELECT
+            id,
+            original_url,
+            short_code,
+            click_count,
+            expires_at,
+            created_at,
+            updated_at
+        FROM links
+        WHERE short_code = #{shortCode}
+    </select>
+
+    <select id="existsByShortCode" parameterType="string" resultType="int">
+        SELECT COUNT(*)
+        FROM links
+        WHERE short_code = #{shortCode}
+    </select>
+
+    <update id="incrementClickCount" parameterType="string">
+        UPDATE links
+        SET click_count = click_count + 1
+        WHERE short_code = #{shortCode}
+    </update>
+
+</mapper>
