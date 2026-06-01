@@ -26,6 +26,7 @@ public class LinkService {
 
     private final LinkMapper linkMapper;
     private final ShortCodeGenerator shortCodeGenerator;
+    private final LinkCacheService linkCacheService;
 
     @Value("${shortlinkops.base-url:http://localhost:8080}")
     private String baseUrl;
@@ -71,12 +72,22 @@ public class LinkService {
 
     @Transactional
     public String resolveOriginalUrl(String shortCode) {
+        return linkCacheService.getOriginalUrl(shortCode)
+                .map(originalUrl -> {
+                    linkMapper.incrementClickCount(shortCode);
+                    return originalUrl;
+                })
+                .orElseGet(() -> resolveOriginalUrlFromDatabase(shortCode));
+    }
+
+    private String resolveOriginalUrlFromDatabase(String shortCode) {
         Link link = findLink(shortCode);
 
         if (link.isExpired()) {
             throw new ExpiredLinkException();
         }
 
+        linkCacheService.cacheOriginalUrl(shortCode, link.getOriginalUrl(), link.getExpiresAt());
         linkMapper.incrementClickCount(shortCode);
         return link.getOriginalUrl();
     }
