@@ -142,7 +142,7 @@ CREATE TABLE links (
 
 `short_code`는 단축 URL 리다이렉트 요청의 핵심 조회 조건이므로 UNIQUE INDEX를 적용합니다.
 
-자세한 SQL 설계는 [docs/database.md](./docs/database.md)를 참고하세요.
+테이블 생성 SQL은 [schema.sql](./src/main/resources/schema.sql)에 정의되어 있습니다.
 
 ## 8. Redis 캐시 전략
 
@@ -152,42 +152,91 @@ shortlink:{shortCode} -> originalUrl
 
 리다이렉트 요청 시 Redis를 먼저 조회하고, 캐시 미스가 발생하면 MySQL에서 조회한 뒤 Redis에 저장합니다.
 
-자세한 캐시 전략은 [docs/redis-cache.md](./docs/redis-cache.md)를 참고하세요.
+```text
+Cache Hit  -> Redis originalUrl 반환 -> click_count 증가 -> redirect
+Cache Miss -> MySQL 조회 -> 만료 확인 -> Redis 저장 -> click_count 증가 -> redirect
+```
+
+클릭 수 증가는 정합성을 위해 Redis가 아니라 MySQL의 단일 `UPDATE` 쿼리로 처리합니다.
+
+Redis key TTL은 링크 만료 시간이 있으면 만료 시간까지로 설정하고, 만료 시간이 없으면 기본 24시간으로 설정합니다. Redis 조회/저장 실패 시에는 로그만 남기고 MySQL 조회 흐름으로 fallback합니다.
 
 ## 9. 로컬 실행 방법
 
-### 1. Repository clone
+### Docker Compose 전체 실행
+
+로컬 Docker Compose 실행은 Spring Boot, MySQL, Redis, Nginx를 함께 실행합니다.
 
 ```bash
 git clone https://github.com/{github-username}/shortlinkops.git
 cd shortlinkops
 ```
 
-### 2. MySQL, Redis 실행
+JAR 빌드:
 
 ```bash
-docker compose up -d mysql redis
+./gradlew clean bootJar
 ```
 
-### 3. Spring Boot 실행
+전체 컨테이너 실행:
 
 ```bash
-./gradlew bootRun
+docker compose up -d --build
 ```
 
-### 4. 접속 확인
+상태 확인:
+
+```bash
+docker compose ps
+docker compose logs -f app
+```
+
+접속:
 
 ```text
-http://localhost:8080
+http://localhost
 ```
 
 Health check:
 
 ```bash
-curl http://localhost:8080/actuator/health
+curl http://localhost/actuator/health
 ```
 
-자세한 실행 방법은 [docs/local-run.md](./docs/local-run.md)를 참고하세요.
+종료:
+
+```bash
+docker compose down
+```
+
+데이터까지 삭제하려면 다음 명령을 사용합니다.
+
+```bash
+docker compose down -v
+```
+
+### Spring Boot 직접 실행
+
+로컬에 MySQL과 Redis를 직접 띄워서 Spring Boot만 실행할 수도 있습니다.
+
+```bash
+cp .env.example .env
+```
+
+`.env`의 DB 접속 정보와 `SHORTLINKOPS_BASE_URL`을 로컬 환경에 맞게 수정합니다.
+
+```bash
+set -a
+source .env
+set +a
+./gradlew bootRun
+```
+
+접속:
+
+```text
+http://localhost:8080
+```
 
 ## 10. AWS EC2 배포
 
@@ -201,7 +250,92 @@ EC2
   └─ redis
 ```
 
-자세한 배포 방법은 [docs/deployment.md](./docs/deployment.md)를 참고하세요.
+Security Group은 다음 포트만 엽니다.
+
+```text
+22  - My IP
+80  - 0.0.0.0/0
+```
+
+외부에 열지 않는 포트:
+
+```text
+8080
+3306
+6379
+```
+
+### EC2 Docker 설치
+
+Amazon Linux 2023 기준:
+
+```bash
+sudo yum update -y
+sudo yum install -y docker git docker-compose-plugin
+
+sudo systemctl enable docker
+sudo systemctl start docker
+
+sudo usermod -aG docker ec2-user
+```
+
+SSH 재접속 후 확인:
+
+```bash
+docker version
+docker compose version
+```
+
+### Docker Hub image로 실행
+
+Docker Hub에 image가 push되어 있으면 운영 Compose 파일을 사용합니다.
+
+```bash
+git clone https://github.com/{github-username}/ShortLinkOps.git
+cd ShortLinkOps
+cp .env.example .env
+```
+
+`.env`에서 아래 값을 운영 환경에 맞게 수정합니다.
+
+```env
+APP_IMAGE=your-dockerhub-username/shortlinkops:latest
+SHORTLINKOPS_BASE_URL=http://your-ec2-public-ip
+MYSQL_USER=shortlink
+MYSQL_PASSWORD=change_me
+MYSQL_ROOT_PASSWORD=change_me_root
+```
+
+실행:
+
+```bash
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+### EC2에서 직접 build
+
+Docker Hub push 전이면 EC2에서 직접 build할 수 있습니다.
+
+```bash
+git clone https://github.com/{github-username}/ShortLinkOps.git
+cd ShortLinkOps
+./gradlew clean bootJar
+docker compose up -d --build
+```
+
+### 배포 확인
+
+```bash
+docker compose ps
+curl http://EC2_PUBLIC_IP/actuator/health
+```
+
+브라우저에서 다음 주소로 접속해 URL 생성, 상세 조회, 리다이렉트, 클릭 수 증가를 확인합니다.
+
+```text
+http://EC2_PUBLIC_IP
+```
 
 ## 11. GitHub Actions
 
@@ -212,7 +346,12 @@ GitHub Actions를 사용하여 다음 작업을 자동화합니다.
 - Docker image build
 - Docker Hub push
 
-자세한 CI/CD 구성은 [docs/github-actions.md](./docs/github-actions.md)를 참고하세요.
+Docker image publish는 `main` 브랜치 push 또는 수동 실행으로 동작합니다. Docker Hub push를 사용하려면 repository secrets에 다음 값을 등록합니다.
+
+```text
+DOCKERHUB_USERNAME
+DOCKERHUB_TOKEN
+```
 
 ## 12. 개발 규칙
 
@@ -222,7 +361,7 @@ GitHub Actions를 사용하여 다음 작업을 자동화합니다.
 
 ## 13. 트러블슈팅
 
-프로젝트 진행 중 발생한 문제와 해결 과정은 [docs/troubleshooting.md](./docs/troubleshooting.md)에 기록합니다.
+프로젝트 진행 중 발생한 문제와 해결 과정은 README 또는 별도 문서로 정리합니다.
 
 ## 14. 인증/인가 기능 제외 이유
 
@@ -240,6 +379,7 @@ GitHub Actions를 사용하여 다음 작업을 자동화합니다.
 - 클릭 로그 테이블 추가
 - 간단한 Rate Limit 적용
 - GitHub Actions 기반 EC2 자동 배포
+- Redis 장애 시 graceful fallback 강화
 - Prometheus/Grafana 모니터링 연동
 - RDS, ElastiCache 기반 관리형 인프라 전환
 
