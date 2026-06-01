@@ -3,6 +3,7 @@ package com.fhwang.shortlinkops.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -27,13 +28,15 @@ class LinkServiceTest {
 
     private LinkMapper linkMapper;
     private ShortCodeGenerator shortCodeGenerator;
+    private LinkCacheService linkCacheService;
     private LinkService linkService;
 
     @BeforeEach
     void setUp() {
         linkMapper = org.mockito.Mockito.mock(LinkMapper.class);
         shortCodeGenerator = org.mockito.Mockito.mock(ShortCodeGenerator.class);
-        linkService = new LinkService(linkMapper, shortCodeGenerator);
+        linkCacheService = org.mockito.Mockito.mock(LinkCacheService.class);
+        linkService = new LinkService(linkMapper, shortCodeGenerator, linkCacheService);
         ReflectionTestUtils.setField(linkService, "baseUrl", "http://short.test");
     }
 
@@ -99,7 +102,19 @@ class LinkServiceTest {
     }
 
     @Test
-    void resolveOriginalUrlIncrementsClickCount() {
+    void resolveOriginalUrlReturnsCachedOriginalUrl() {
+        when(linkCacheService.getOriginalUrl("abc123")).thenReturn(Optional.of("https://example.com"));
+
+        String originalUrl = linkService.resolveOriginalUrl("abc123");
+
+        assertThat(originalUrl).isEqualTo("https://example.com");
+        verify(linkMapper, never()).findByShortCode(anyString());
+        verify(linkMapper).incrementClickCount("abc123");
+        verify(linkCacheService, never()).cacheOriginalUrl(anyString(), anyString(), any());
+    }
+
+    @Test
+    void resolveOriginalUrlIncrementsClickCountAndCachesOnCacheMiss() {
         Link link = Link.builder()
                 .originalUrl("https://example.com")
                 .shortCode("abc123")
@@ -107,11 +122,13 @@ class LinkServiceTest {
                 .expiresAt(LocalDateTime.now().plusDays(1))
                 .build();
 
+        when(linkCacheService.getOriginalUrl("abc123")).thenReturn(Optional.empty());
         when(linkMapper.findByShortCode("abc123")).thenReturn(Optional.of(link));
 
         String originalUrl = linkService.resolveOriginalUrl("abc123");
 
         assertThat(originalUrl).isEqualTo("https://example.com");
+        verify(linkCacheService).cacheOriginalUrl("abc123", "https://example.com", link.getExpiresAt());
         verify(linkMapper).incrementClickCount("abc123");
     }
 
@@ -124,10 +141,12 @@ class LinkServiceTest {
                 .expiresAt(LocalDateTime.now().minusSeconds(1))
                 .build();
 
+        when(linkCacheService.getOriginalUrl("abc123")).thenReturn(Optional.empty());
         when(linkMapper.findByShortCode("abc123")).thenReturn(Optional.of(link));
 
         assertThatThrownBy(() -> linkService.resolveOriginalUrl("abc123"))
                 .isInstanceOf(ExpiredLinkException.class);
+        verify(linkCacheService, never()).cacheOriginalUrl(anyString(), anyString(), any());
         verify(linkMapper, never()).incrementClickCount("abc123");
     }
 }
