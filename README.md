@@ -6,7 +6,7 @@
 
 **ShortLinkOps**는 긴 URL을 짧은 URL로 변환하고, 단축 URL 접속 시 원본 URL로 리다이렉트하는 Spring Boot 기반 URL 단축 서비스입니다.
 
-단순 CRUD 구현에 그치지 않고, URL 리다이렉트 요청의 특성을 고려하여 Redis 캐시를 적용하고, MyBatis를 사용해 SQL을 직접 작성합니다. 또한 Docker Compose 기반으로 애플리케이션, MySQL, Redis, Nginx를 분리 실행하며, AWS EC2 환경에 배포 가능한 구조로 구성합니다.
+단순 CRUD 구현에 그치지 않고, URL 리다이렉트 요청의 특성을 고려하여 Redis 캐시를 적용하고, MyBatis를 사용해 SQL을 직접 작성합니다. 또한 Docker Compose 기반으로 애플리케이션, MySQL, Redis를 분리 실행하며, AWS EC2 환경에 배포 가능한 구조로 구성합니다.
 
 ## 2. 프로젝트 목표
 
@@ -88,10 +88,16 @@
 User
   |
   v
-EC2 Public IP or Domain
+Route53 Domain
   |
   v
-Nginx Container :80
+Elastic IP
+  |
+  v
+EC2 Host Nginx :443
+  |
+  v
+EC2 localhost :8081
   |
   v
 Spring Boot Container :8080
@@ -101,7 +107,7 @@ Spring Boot Container :8080
   +--> Redis Container :6379
 ```
 
-외부에는 Nginx의 80 포트만 노출합니다. Spring Boot, MySQL, Redis는 Docker 내부 네트워크에서만 접근하도록 구성합니다.
+외부에는 EC2 호스트 Nginx의 80, 443 포트만 노출합니다. Spring Boot 컨테이너는 EC2 내부의 `127.0.0.1:8081`에서만 접근하고, MySQL과 Redis는 Docker 내부 네트워크에서만 접근하도록 구성합니다.
 
 ## 6. URL 설계
 
@@ -165,7 +171,7 @@ Redis key TTL은 링크 만료 시간이 있으면 만료 시간까지로 설정
 
 ### Docker Compose 전체 실행
 
-로컬 Docker Compose 실행은 Spring Boot, MySQL, Redis, Nginx를 함께 실행합니다.
+로컬 Docker Compose 실행은 Spring Boot, MySQL, Redis를 함께 실행합니다.
 
 ```bash
 git clone https://github.com/{github-username}/shortlinkops.git
@@ -194,13 +200,13 @@ docker compose logs -f app
 접속:
 
 ```text
-http://localhost
+http://localhost:8080
 ```
 
 Health check:
 
 ```bash
-curl http://localhost/actuator/health
+curl http://localhost:8080/actuator/health
 ```
 
 종료:
@@ -240,43 +246,73 @@ http://localhost:8080
 
 ## 10. AWS EC2 배포
 
-AWS 비용을 최소화하기 위해 RDS와 ElastiCache를 사용하지 않고, 단일 EC2 인스턴스에서 Docker Compose로 실행합니다.
+AWS 비용을 최소화하기 위해 RDS와 ElastiCache를 사용하지 않고, 단일 EC2 인스턴스에서 Docker Compose로 실행합니다. 도메인은 Route53 Hosted Zone으로 관리하고, Elastic IP를 A 레코드에 연결합니다.
 
 ```text
-EC2
-  ├─ nginx
-  ├─ spring boot app
-  ├─ mysql
-  └─ redis
+Route53
+  ├─ fhwang.cloud      -> Elastic IP
+  └─ www.fhwang.cloud  -> Elastic IP
+
+EC2 Host
+  ├─ nginx :80/:443
+  └─ Docker Compose
+      ├─ spring boot app :8081 -> :8080
+      ├─ mysql
+      └─ redis
 ```
 
 Security Group은 다음 포트만 엽니다.
 
 ```text
-22  - My IP
+22  - 0.0.0.0/0
 80  - 0.0.0.0/0
+443 - 0.0.0.0/0
 ```
 
 외부에 열지 않는 포트:
 
 ```text
 8080
+8081
 3306
 6379
 ```
 
-### EC2 Docker 설치
+### Terraform으로 인프라 생성
 
-Amazon Linux 2023 기준:
+EC2, Security Group, Elastic IP, Route53 Hosted Zone, A 레코드는 Terraform으로 생성할 수 있습니다.
 
 ```bash
-sudo yum update -y
-sudo yum install -y docker git docker-compose-plugin
+cd infra/terraform
+cp terraform.tfvars.example terraform.tfvars
+aws sts get-caller-identity
+terraform init
+terraform plan
+terraform apply
+```
+
+자세한 사용 방법은 [infra/terraform/README.md](./infra/terraform/README.md)를 참고하세요.
+
+Terraform 구성은 dev 배포에서 default VPC를 사용하고, Ubuntu 24.04 LTS x86_64 EC2를 생성합니다. 보안그룹은 SSH 22, HTTP 80, HTTPS 443만 허용하며, 키페어는 Terraform이 생성합니다. AWS 인증은 Access Key를 tfvars에 넣지 않고 AWS CLI 로그인 또는 AWS profile을 사용합니다.
+
+Terraform 적용 후 `hosted_zone_name_servers` 출력값을 도메인 등록기관의 name server로 설정합니다. NS 변경이 반영되면 EC2의 Certbot 타이머가 `fhwang.cloud`, `www.fhwang.cloud` 인증서를 발급하고 HTTP 요청을 HTTPS로 리다이렉트하도록 Nginx 설정을 적용합니다.
+
+Let's Encrypt 인증서는 기본 90일 동안 유효합니다. EC2에서는 Certbot 기본 갱신 타이머가 주기적으로 갱신을 확인하고, 갱신 완료 후 Nginx를 reload합니다.
+
+### EC2 Docker 설치
+
+Terraform으로 생성한 EC2는 `user_data`가 Docker, Docker Compose, Git, Nginx, Certbot을 자동 설치합니다. 수동으로 같은 상태를 만들거나 설치 상태를 확인할 때는 아래 명령을 사용합니다.
+
+Ubuntu 기준:
+
+```bash
+sudo apt-get update -y
+sudo apt-get install -y docker.io docker-compose-v2 git
 
 sudo systemctl enable docker
 sudo systemctl start docker
 
-sudo usermod -aG docker ec2-user
+sudo usermod -aG docker ubuntu
 ```
 
 SSH 재접속 후 확인:
@@ -300,7 +336,7 @@ cp .env.example .env
 
 ```env
 APP_IMAGE=your-dockerhub-username/shortlinkops:latest
-SHORTLINKOPS_BASE_URL=http://your-ec2-public-ip
+SHORTLINKOPS_BASE_URL=https://www.fhwang.cloud
 MYSQL_USER=shortlink
 MYSQL_PASSWORD=change_me
 MYSQL_ROOT_PASSWORD=change_me_root
@@ -312,6 +348,8 @@ MYSQL_ROOT_PASSWORD=change_me_root
 docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 ```
+
+운영 Compose의 Spring Boot 컨테이너는 EC2 내부 `127.0.0.1:8081`에만 바인딩됩니다. 외부 80, 443 포트와 HTTPS 인증서는 EC2 호스트 Nginx가 처리합니다.
 
 ### EC2에서 직접 build
 
@@ -328,13 +366,13 @@ docker compose up -d --build
 
 ```bash
 docker compose ps
-curl http://EC2_PUBLIC_IP/actuator/health
+curl https://www.fhwang.cloud/actuator/health
 ```
 
 브라우저에서 다음 주소로 접속해 URL 생성, 상세 조회, 리다이렉트, 클릭 수 증가를 확인합니다.
 
 ```text
-http://EC2_PUBLIC_IP
+https://www.fhwang.cloud
 ```
 
 ## 11. GitHub Actions
@@ -371,8 +409,7 @@ DOCKERHUB_TOKEN
 
 ## 15. 개선 예정 사항
 
-- HTTPS 적용
-- 도메인 연결
+- HTTPS 인증서 자동 갱신 상태 모니터링
 - Spring Security 기반 회원가입/로그인
 - 사용자별 링크 관리
 - 커스텀 shortCode 지정 기능
