@@ -335,7 +335,7 @@ cp .env.example .env
 `.env`에서 아래 값을 운영 환경에 맞게 수정합니다.
 
 ```env
-APP_IMAGE=your-dockerhub-username/shortlinkops:latest
+APP_IMAGE=your-dockerhub-username/shortlinkops:commit-sha
 SHORTLINKOPS_BASE_URL=https://www.fhwang.cloud
 MYSQL_USER=shortlink
 MYSQL_PASSWORD=change_me
@@ -383,13 +383,31 @@ GitHub Actions를 사용하여 다음 작업을 자동화합니다.
 - Gradle build
 - Docker image build
 - Docker Hub push
+- 운영 배포 자동화
 
-Docker image publish는 `main` 브랜치 push 또는 수동 실행으로 동작합니다. Docker Hub push를 사용하려면 repository secrets에 다음 값을 등록합니다.
+`dev` 브랜치에 push되면 `Deploy Prod` workflow가 테스트와 빌드를 실행하고 Docker Hub에 현재 commit SHA 태그 이미지를 push한 뒤 EC2에서 운영 Compose 컨테이너를 갱신합니다.
+
+Docker Hub push와 EC2 배포를 사용하려면 repository secrets에 다음 값을 등록합니다.
 
 ```text
 DOCKERHUB_USERNAME
 DOCKERHUB_TOKEN
+EC2_HOST
+EC2_SSH_KEY
 ```
+
+`EC2_HOST`는 EC2 Elastic IP 또는 접속 가능한 도메인입니다. `EC2_SSH_KEY`는 EC2 접속에 사용하는 private key 전체 내용입니다.
+
+EC2는 배포 시 Docker Hub에서 현재 commit SHA 태그 이미지를 pull합니다. 별도 서버 로그인을 구성하지 않았으므로 MVP 단계에서는 Docker Hub repository를 public으로 운영합니다.
+
+필요하면 repository variables로 아래 값을 변경할 수 있습니다.
+
+```text
+EC2_USER=ubuntu
+EC2_APP_DIR=/home/ubuntu/ShortLinkOps
+```
+
+`main` 브랜치 push 또는 수동 실행 시에는 `Docker Publish` workflow가 Docker Hub에 현재 commit SHA 태그 이미지를 push합니다.
 
 ## 12. 개발 규칙
 

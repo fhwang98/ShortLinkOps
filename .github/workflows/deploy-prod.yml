@@ -1,0 +1,108 @@
+name: Deploy Prod
+
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_REPOSITORY: ${{ secrets.DOCKERHUB_USERNAME }}/shortlinkops
+  EC2_USER: ${{ vars.EC2_USER || 'ubuntu' }}
+  EC2_APP_DIR: ${{ vars.EC2_APP_DIR || '/home/ubuntu/ShortLinkOps' }}
+
+jobs:
+  deploy:
+    name: Build, Push, and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: JDK 17 설정
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      - name: Gradle 실행 권한 부여
+        run: chmod +x gradlew
+
+      - name: 테스트 및 애플리케이션 빌드
+        run: ./gradlew clean build
+
+      - name: Docker Buildx 설정
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker Hub 로그인
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Docker 이미지 빌드 및 push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE_REPOSITORY }}:${{ github.sha }}
+
+      - name: EC2 SSH 키 준비
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/shortlinkops-deploy-key
+          chmod 600 ~/.ssh/shortlinkops-deploy-key
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: EC2 컨테이너 배포
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ env.EC2_USER }}
+          EC2_APP_DIR: ${{ env.EC2_APP_DIR }}
+          APP_IMAGE: ${{ env.IMAGE_REPOSITORY }}:${{ github.sha }}
+          REPOSITORY_URL: https://github.com/${{ github.repository }}.git
+        run: |
+          ssh -i ~/.ssh/shortlinkops-deploy-key "${EC2_USER}@${EC2_HOST}" \
+            "EC2_APP_DIR='${EC2_APP_DIR}' APP_IMAGE='${APP_IMAGE}' REPOSITORY_URL='${REPOSITORY_URL}' bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          if [ ! -d "$EC2_APP_DIR/.git" ]; then
+            mkdir -p "$(dirname "$EC2_APP_DIR")"
+            git clone --branch dev "$REPOSITORY_URL" "$EC2_APP_DIR"
+          fi
+
+          cd "$EC2_APP_DIR"
+          git fetch origin dev
+          git checkout dev
+          git pull --ff-only origin dev
+
+          if [ ! -f .env ]; then
+            echo ".env 파일이 없습니다. $EC2_APP_DIR/.env 파일을 먼저 생성하세요."
+            exit 1
+          fi
+
+          sudo env "APP_IMAGE=$APP_IMAGE" docker compose -f docker-compose.prod.yml pull
+          sudo env "APP_IMAGE=$APP_IMAGE" docker compose -f docker-compose.prod.yml up -d --remove-orphans
+
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8081/actuator/health >/dev/null; then
+              sudo docker image prune -f
+              exit 0
+            fi
+
+            sleep 5
+          done
+
+          sudo docker compose -f docker-compose.prod.yml ps
+          sudo docker compose -f docker-compose.prod.yml logs app --tail=100
+          exit 1
+          REMOTE
