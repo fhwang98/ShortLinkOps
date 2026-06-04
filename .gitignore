@@ -58,6 +58,22 @@ mysql-data/
 redis-data/
 
 # =========================================================
+# Terraform
+# =========================================================
+.terraform/
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+!terraform.tfvars.example
+!**/terraform.tfvars.example
+crash.log
+crash.*.log
+infra/terraform/generated/
+*.pem
+
+# =========================================================
 # macOS
 # =========================================================
 .DS_Store

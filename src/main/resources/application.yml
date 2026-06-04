@@ -42,6 +42,9 @@ management:
     env:
       enabled: true
 
+server:
+  forward-headers-strategy: framework
+
 info:
   app:
     name: shortlinkops
