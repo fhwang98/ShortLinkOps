@@ -42,4 +42,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/shortlinkops:latest
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/shortlinkops:${{ github.sha }}
