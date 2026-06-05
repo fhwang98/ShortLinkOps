@@ -383,7 +383,15 @@ GitHub Actions를 사용하여 다음 작업을 자동화합니다.
 - Docker Hub push
 - 운영 배포 자동화
 
-`dev` 브랜치에 push되면 `Deploy Prod` workflow가 테스트와 빌드를 실행하고 Docker Hub에 현재 commit SHA 태그 이미지를 push한 뒤 EC2에서 운영 Compose 컨테이너를 갱신합니다.
+브랜치별 자동화 기준은 다음과 같습니다.
+
+```text
+dev        -> CI
+release/*  -> CI
+main       -> CI, Deploy Prod
+```
+
+`main` 브랜치에 push되면 `Deploy Prod` workflow가 테스트와 빌드를 실행하고 Docker Hub에 현재 commit SHA 태그 이미지를 push한 뒤 EC2에서 운영 Compose 컨테이너를 갱신합니다. `Deploy Prod`는 수동 실행도 가능하지만, `main` 브랜치에서 실행할 때만 실제 배포 job이 동작합니다.
 
 Docker Hub push와 EC2 배포를 사용하려면 repository secrets에 다음 값을 등록합니다.
 
@@ -405,7 +413,7 @@ EC2_USER=ubuntu
 EC2_APP_DIR=/home/ubuntu/ShortLinkOps
 ```
 
-`main` 브랜치 push 또는 수동 실행 시에는 `Docker Publish` workflow가 Docker Hub에 현재 commit SHA 태그 이미지를 push합니다.
+`Docker Publish` workflow는 수동 실행 전용입니다. 운영 배포는 `Deploy Prod` workflow가 이미지 push와 EC2 배포를 함께 처리합니다.
 
 ## 12. 개발 규칙
 

@@ -3,7 +3,7 @@ name: Deploy Prod
 on:
   push:
     branches:
-      - dev
+      - main
   workflow_dispatch:
 
 concurrency:
@@ -22,6 +22,7 @@ jobs:
   deploy:
     name: Build, Push, and Deploy
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
 
     steps:
       - name: 저장소 체크아웃
@@ -77,13 +78,12 @@ jobs:
 
           if [ ! -d "$EC2_APP_DIR/.git" ]; then
             mkdir -p "$(dirname "$EC2_APP_DIR")"
-            git clone --branch dev "$REPOSITORY_URL" "$EC2_APP_DIR"
+            git clone --branch main "$REPOSITORY_URL" "$EC2_APP_DIR"
           fi
 
           cd "$EC2_APP_DIR"
-          git fetch origin dev
-          git checkout dev
-          git pull --ff-only origin dev
+          git fetch origin main
+          git checkout -B main origin/main
 
           if [ ! -f .env ]; then
             echo ".env 파일이 없습니다. $EC2_APP_DIR/.env 파일을 먼저 생성하세요."
