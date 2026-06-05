@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>생성 완료 | ShortLinkOps</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<main class="container">
+    <section class="panel">
+        <div class="page-header">
+            <p class="eyebrow">ShortLinkOps</p>
+            <h1>단축 URL 생성 완료</h1>
+        </div>
+
+        <dl class="details">
+            <div>
+                <dt>원본 URL</dt>
+                <dd class="url-text" th:text="${link.originalUrl}">https://example.com</dd>
+            </div>
+            <div>
+                <dt>shortCode</dt>
+                <dd th:text="${link.shortCode}">abc123</dd>
+            </div>
+            <div>
+                <dt>단축 URL</dt>
+                <dd class="url-text">
+                    <a th:href="${link.shortUrl}" th:text="${link.shortUrl}">http://localhost:8080/s/abc123</a>
+                </dd>
+            </div>
+            <div>
+                <dt>만료 시간</dt>
+                <dd th:text="${link.expiresAt != null ? link.expiresAt : '만료 없음'}">만료 없음</dd>
+            </div>
+            <div>
+                <dt>생성일</dt>
+                <dd th:text="${link.createdAt}">2026-01-01T00:00</dd>
+            </div>
+        </dl>
+
+        <div class="actions">
+            <a class="button secondary" th:href="@{/links/{shortCode}(shortCode=${link.shortCode})}">상세 보기</a>
+            <a class="button ghost" th:href="@{/}">메인으로</a>
+        </div>
+    </section>
+</main>
+</body>
+</html>

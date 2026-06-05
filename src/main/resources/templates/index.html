@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShortLinkOps</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<main class="container">
+    <section class="panel">
+        <div class="page-header">
+            <p class="eyebrow">ShortLinkOps</p>
+            <h1>단축 URL 생성</h1>
+        </div>
+
+        <form class="form" method="post" action="/links" th:object="${request}">
+            <div class="field">
+                <label for="originalUrl">원본 URL</label>
+                <input id="originalUrl" type="url" th:field="*{originalUrl}" placeholder="https://example.com" required>
+                <p class="error-message" th:if="${#fields.hasErrors('originalUrl')}" th:errors="*{originalUrl}"></p>
+            </div>
+
+            <div class="field">
+                <label for="expiresAt">만료 시간</label>
+                <input id="expiresAt" type="datetime-local" th:field="*{expiresAt}">
+                <p class="field-help">비워두면 만료 없이 생성됩니다.</p>
+            </div>
+
+            <button type="submit">단축 URL 생성</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>
