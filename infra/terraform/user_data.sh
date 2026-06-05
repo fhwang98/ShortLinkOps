@@ -150,7 +150,7 @@ ShortLinkOps EC2 호스트 준비가 완료되었습니다.
 
 다음 단계:
 1. ShortLinkOps 저장소를 clone합니다.
-2. .env.example을 기준으로 .env를 만들고 SHORTLINKOPS_BASE_URL=${shortlinkops_base_url} 값을 설정합니다.
+2. .env.prod.example을 기준으로 .env를 만들고 SHORTLINKOPS_BASE_URL=${shortlinkops_base_url} 값을 설정합니다.
 3. 프로젝트 README의 Docker Compose 배포 명령을 실행합니다.
 EOT
 
