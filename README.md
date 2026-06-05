@@ -227,14 +227,10 @@ docker compose down -v
 
 ```bash
 cp .env.example .env
-```
-
-`.env`의 DB 접속 정보와 `SHORTLINKOPS_BASE_URL`을 로컬 환경에 맞게 수정합니다.
-
-```bash
 set -a
 source .env
 set +a
+
 ./gradlew bootRun
 ```
 
@@ -324,29 +320,41 @@ docker compose version
 
 ### Docker Hub image로 실행
 
-Docker Hub에 image가 push되어 있으면 운영 Compose 파일을 사용합니다.
+Docker Hub에 image가 push되어 있으면 운영 Compose 파일을 사용할 수 있습니다. 운영 자동 배포는 `main` 브랜치의 `Deploy Prod` workflow가 처리하며, EC2에 `.env` 파일을 만들지 않고 GitHub Secrets와 Variables를 실행 시점 환경변수로 전달합니다.
+
+EC2에서 직접 Compose를 실행해야 한다면 필요한 값을 shell 환경변수로 전달합니다.
 
 ```bash
 git clone https://github.com/{github-username}/ShortLinkOps.git
 cd ShortLinkOps
-cp .env.example .env
+
+export APP_IMAGE=fhwang98/shortlinkops:{commit-sha}
+export MYSQL_USER=shortlink
+export MYSQL_PASSWORD={mysql-password}
+export MYSQL_ROOT_PASSWORD={mysql-root-password}
+export SHORTLINKOPS_BASE_URL=https://www.fhwang.cloud
 ```
 
-`.env`에서 아래 값을 운영 환경에 맞게 수정합니다.
-
-```env
-APP_IMAGE=your-dockerhub-username/shortlinkops:commit-sha
-SHORTLINKOPS_BASE_URL=https://www.fhwang.cloud
-MYSQL_USER=shortlink
-MYSQL_PASSWORD=change_me
-MYSQL_ROOT_PASSWORD=change_me_root
-```
+`APP_IMAGE`는 GitHub Actions 자동 배포 시 현재 commit SHA 이미지로 설정됩니다. EC2에서 수동으로 운영 Compose를 실행할 때만 실제 Docker Hub 이미지 태그를 직접 지정합니다.
 
 실행:
 
 ```bash
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d
+sudo env \
+  "APP_IMAGE=$APP_IMAGE" \
+  "MYSQL_USER=$MYSQL_USER" \
+  "MYSQL_PASSWORD=$MYSQL_PASSWORD" \
+  "MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD" \
+  "SHORTLINKOPS_BASE_URL=$SHORTLINKOPS_BASE_URL" \
+  docker compose -f docker-compose.prod.yml pull
+
+sudo env \
+  "APP_IMAGE=$APP_IMAGE" \
+  "MYSQL_USER=$MYSQL_USER" \
+  "MYSQL_PASSWORD=$MYSQL_PASSWORD" \
+  "MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD" \
+  "SHORTLINKOPS_BASE_URL=$SHORTLINKOPS_BASE_URL" \
+  docker compose -f docker-compose.prod.yml up -d
 ```
 
 운영 Compose의 Spring Boot 컨테이너는 EC2 내부 `127.0.0.1:8081`에만 바인딩됩니다. 외부 80, 443 포트와 HTTPS 인증서는 EC2 호스트 Nginx가 처리합니다.
@@ -385,7 +393,15 @@ GitHub Actions를 사용하여 다음 작업을 자동화합니다.
 - Docker Hub push
 - 운영 배포 자동화
 
-`dev` 브랜치에 push되면 `Deploy Prod` workflow가 테스트와 빌드를 실행하고 Docker Hub에 현재 commit SHA 태그 이미지를 push한 뒤 EC2에서 운영 Compose 컨테이너를 갱신합니다.
+브랜치별 자동화 기준은 다음과 같습니다.
+
+```text
+dev        -> CI
+release/*  -> CI
+main       -> CI, Deploy Prod
+```
+
+`main` 브랜치에 push되면 `Deploy Prod` workflow가 테스트와 빌드를 실행하고 Docker Hub에 현재 commit SHA 태그 이미지를 push한 뒤 EC2에서 운영 Compose 컨테이너를 갱신합니다. `Deploy Prod`는 수동 실행도 가능하지만, `main` 브랜치에서 실행할 때만 실제 배포 job이 동작합니다.
 
 Docker Hub push와 EC2 배포를 사용하려면 repository secrets에 다음 값을 등록합니다.
 
@@ -394,9 +410,15 @@ DOCKERHUB_USERNAME
 DOCKERHUB_TOKEN
 EC2_HOST
 EC2_SSH_KEY
+MYSQL_PASSWORD
+MYSQL_ROOT_PASSWORD
 ```
 
-`EC2_HOST`는 EC2 Elastic IP 또는 접속 가능한 도메인입니다. `EC2_SSH_KEY`는 EC2 접속에 사용하는 private key 전체 내용입니다.
+`EC2_HOST`는 EC2 Elastic IP 또는 접속 가능한 도메인입니다. `EC2_SSH_KEY`는 EC2 접속에 사용하는 private key 전체 내용입니다. `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD`는 운영 MySQL 컨테이너에서 사용할 비밀번호입니다.
+
+운영 자동 배포 시 GitHub Secrets와 Variables는 EC2에 `.env` 파일로 저장되지 않고, `docker compose` 실행 시점의 환경변수로 직접 주입됩니다. EC2에 직접 접속해서 `.env`를 수정할 필요가 없습니다.
+
+MySQL 비밀번호는 최초 DB volume 초기화 시점에 적용됩니다. 이미 운영 DB volume이 생성된 뒤 `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD`를 변경하려면 DB 계정 비밀번호도 함께 변경하거나 volume 초기화를 별도로 진행합니다.
 
 EC2는 배포 시 Docker Hub에서 현재 commit SHA 태그 이미지를 pull합니다. 별도 서버 로그인을 구성하지 않았으므로 MVP 단계에서는 Docker Hub repository를 public으로 운영합니다.
 
@@ -405,9 +427,11 @@ EC2는 배포 시 Docker Hub에서 현재 commit SHA 태그 이미지를 pull합
 ```text
 EC2_USER=ubuntu
 EC2_APP_DIR=/home/ubuntu/ShortLinkOps
+MYSQL_USER=shortlink
+SHORTLINKOPS_BASE_URL=https://www.fhwang.cloud
 ```
 
-`main` 브랜치 push 또는 수동 실행 시에는 `Docker Publish` workflow가 Docker Hub에 현재 commit SHA 태그 이미지를 push합니다.
+`Docker Publish` workflow는 수동 실행 전용입니다. 운영 배포는 `Deploy Prod` workflow가 이미지 push와 EC2 배포를 함께 처리합니다.
 
 ## 12. 개발 규칙
 
@@ -415,17 +439,28 @@ EC2_APP_DIR=/home/ubuntu/ShortLinkOps
 
 자세한 내용은 [CONTRIBUTING.md](./CONTRIBUTING.md)를 참고하세요.
 
-## 13. 트러블슈팅
+## 13. Release 준비
+
+v1.0.0 릴리스 전 아래 항목을 확인합니다.
+
+- `dev` 브랜치 CI 통과
+- EC2 운영 배포 성공
+- `https://www.fhwang.cloud/actuator/health` 응답 확인
+- 단축 URL 생성, 조회, 리다이렉트 동작 확인
+- Route53 A 레코드와 HTTPS 리다이렉트 확인
+- `main` 병합 전 민감 정보 미포함 확인
+
+## 14. 트러블슈팅
 
 프로젝트 진행 중 발생한 문제와 해결 과정은 README 또는 별도 문서로 정리합니다.
 
-## 14. 인증/인가 기능 제외 이유
+## 15. 인증/인가 기능 제외 이유
 
 본 프로젝트의 1차 목표는 URL 단축 서비스의 핵심 기능, MyBatis 기반 SQL 처리, Redis 캐시, Docker Compose 기반 실행 환경, AWS EC2 배포를 완성하는 것입니다.
 
 인증/인가 기능은 프로젝트 범위를 과도하게 확장할 수 있으므로 1차 버전에서는 제외했습니다. 추후 Spring Security를 도입하여 회원가입, 로그인, 사용자별 링크 관리 기능을 확장할 예정입니다.
 
-## 15. 개선 예정 사항
+## 16. 개선 예정 사항
 
 - HTTPS 인증서 자동 갱신 상태 모니터링
 - Spring Security 기반 회원가입/로그인
@@ -433,12 +468,11 @@ EC2_APP_DIR=/home/ubuntu/ShortLinkOps
 - 커스텀 shortCode 지정 기능
 - 클릭 로그 테이블 추가
 - 간단한 Rate Limit 적용
-- GitHub Actions 기반 EC2 자동 배포
 - Redis 장애 시 graceful fallback 강화
 - Prometheus/Grafana 모니터링 연동
 - RDS, ElastiCache 기반 관리형 인프라 전환
 
-## 16. 프로젝트 핵심 포인트
+## 17. 프로젝트 핵심 포인트
 
 - Spring Boot 기반 백엔드 API 구현 능력
 - MyBatis를 활용한 SQL 직접 작성 능력
