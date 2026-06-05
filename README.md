@@ -226,7 +226,7 @@ docker compose down -v
 로컬에 MySQL과 Redis를 직접 띄워서 Spring Boot만 실행할 수도 있습니다.
 
 ```bash
-cp .env.dev.example .env
+cp .env.example .env
 set -a
 source .env
 set +a
@@ -320,31 +320,41 @@ docker compose version
 
 ### Docker Hub image로 실행
 
-Docker Hub에 image가 push되어 있으면 운영 Compose 파일을 사용합니다.
+Docker Hub에 image가 push되어 있으면 운영 Compose 파일을 사용할 수 있습니다. 운영 자동 배포는 `main` 브랜치의 `Deploy Prod` workflow가 처리하며, EC2에 `.env` 파일을 만들지 않고 GitHub Secrets와 Variables를 실행 시점 환경변수로 전달합니다.
+
+EC2에서 직접 Compose를 실행해야 한다면 필요한 값을 shell 환경변수로 전달합니다.
 
 ```bash
 git clone https://github.com/{github-username}/ShortLinkOps.git
 cd ShortLinkOps
-cp .env.prod.example .env
+
+export APP_IMAGE=fhwang98/shortlinkops:{commit-sha}
+export MYSQL_USER=shortlink
+export MYSQL_PASSWORD={mysql-password}
+export MYSQL_ROOT_PASSWORD={mysql-root-password}
+export SHORTLINKOPS_BASE_URL=https://www.fhwang.cloud
 ```
 
-`.env`에서 아래 값을 운영 환경에 맞게 수정합니다.
-
-```env
-APP_IMAGE=placeholder
-MYSQL_USER=shortlink
-MYSQL_PASSWORD=change_me
-MYSQL_ROOT_PASSWORD=change_me_root
-SHORTLINKOPS_BASE_URL=https://www.fhwang.cloud
-```
-
-`APP_IMAGE`는 GitHub Actions 자동 배포 시 현재 commit SHA 이미지로 덮어씁니다. EC2에서 수동으로 운영 Compose를 실행할 때만 실제 Docker Hub 이미지 태그로 변경합니다.
+`APP_IMAGE`는 GitHub Actions 자동 배포 시 현재 commit SHA 이미지로 설정됩니다. EC2에서 수동으로 운영 Compose를 실행할 때만 실제 Docker Hub 이미지 태그를 직접 지정합니다.
 
 실행:
 
 ```bash
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d
+sudo env \
+  "APP_IMAGE=$APP_IMAGE" \
+  "MYSQL_USER=$MYSQL_USER" \
+  "MYSQL_PASSWORD=$MYSQL_PASSWORD" \
+  "MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD" \
+  "SHORTLINKOPS_BASE_URL=$SHORTLINKOPS_BASE_URL" \
+  docker compose -f docker-compose.prod.yml pull
+
+sudo env \
+  "APP_IMAGE=$APP_IMAGE" \
+  "MYSQL_USER=$MYSQL_USER" \
+  "MYSQL_PASSWORD=$MYSQL_PASSWORD" \
+  "MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD" \
+  "SHORTLINKOPS_BASE_URL=$SHORTLINKOPS_BASE_URL" \
+  docker compose -f docker-compose.prod.yml up -d
 ```
 
 운영 Compose의 Spring Boot 컨테이너는 EC2 내부 `127.0.0.1:8081`에만 바인딩됩니다. 외부 80, 443 포트와 HTTPS 인증서는 EC2 호스트 Nginx가 처리합니다.

@@ -42,8 +42,7 @@ application-prod.yaml
 # Environment variables
 .env
 .env.*
-!.env.dev.example
-!.env.prod.example
+!.env.example
 
 # =========================================================
 # Logs
