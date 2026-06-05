@@ -400,9 +400,15 @@ DOCKERHUB_USERNAME
 DOCKERHUB_TOKEN
 EC2_HOST
 EC2_SSH_KEY
+MYSQL_PASSWORD
+MYSQL_ROOT_PASSWORD
 ```
 
-`EC2_HOST`는 EC2 Elastic IP 또는 접속 가능한 도메인입니다. `EC2_SSH_KEY`는 EC2 접속에 사용하는 private key 전체 내용입니다.
+`EC2_HOST`는 EC2 Elastic IP 또는 접속 가능한 도메인입니다. `EC2_SSH_KEY`는 EC2 접속에 사용하는 private key 전체 내용입니다. `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD`는 운영 MySQL 컨테이너에서 사용할 비밀번호입니다.
+
+운영 자동 배포 시 GitHub Secrets와 Variables는 EC2에 `.env` 파일로 저장되지 않고, `docker compose` 실행 시점의 환경변수로 직접 주입됩니다. EC2에 직접 접속해서 `.env`를 수정할 필요가 없습니다.
+
+MySQL 비밀번호는 최초 DB volume 초기화 시점에 적용됩니다. 이미 운영 DB volume이 생성된 뒤 `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD`를 변경하려면 DB 계정 비밀번호도 함께 변경하거나 volume 초기화를 별도로 진행합니다.
 
 EC2는 배포 시 Docker Hub에서 현재 commit SHA 태그 이미지를 pull합니다. 별도 서버 로그인을 구성하지 않았으므로 MVP 단계에서는 Docker Hub repository를 public으로 운영합니다.
 
@@ -411,6 +417,8 @@ EC2는 배포 시 Docker Hub에서 현재 commit SHA 태그 이미지를 pull합
 ```text
 EC2_USER=ubuntu
 EC2_APP_DIR=/home/ubuntu/ShortLinkOps
+MYSQL_USER=shortlink
+SHORTLINKOPS_BASE_URL=https://www.fhwang.cloud
 ```
 
 `Docker Publish` workflow는 수동 실행 전용입니다. 운영 배포는 `Deploy Prod` workflow가 이미지 push와 EC2 배포를 함께 처리합니다.

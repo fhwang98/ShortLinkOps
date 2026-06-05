@@ -71,9 +71,20 @@ jobs:
           EC2_APP_DIR: ${{ env.EC2_APP_DIR }}
           APP_IMAGE: ${{ env.IMAGE_REPOSITORY }}:${{ github.sha }}
           REPOSITORY_URL: https://github.com/${{ github.repository }}.git
+          MYSQL_USER: ${{ vars.MYSQL_USER || 'shortlink' }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          SHORTLINKOPS_BASE_URL: ${{ vars.SHORTLINKOPS_BASE_URL || 'https://www.fhwang.cloud' }}
         run: |
+          set +x
+          : "${MYSQL_PASSWORD:?MYSQL_PASSWORD secret is required}"
+          : "${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD secret is required}"
+
+          remote_env=$(printf 'EC2_APP_DIR=%q APP_IMAGE=%q REPOSITORY_URL=%q MYSQL_USER=%q MYSQL_PASSWORD=%q MYSQL_ROOT_PASSWORD=%q SHORTLINKOPS_BASE_URL=%q' \
+            "$EC2_APP_DIR" "$APP_IMAGE" "$REPOSITORY_URL" "$MYSQL_USER" "$MYSQL_PASSWORD" "$MYSQL_ROOT_PASSWORD" "$SHORTLINKOPS_BASE_URL")
+
           ssh -i ~/.ssh/shortlinkops-deploy-key "${EC2_USER}@${EC2_HOST}" \
-            "EC2_APP_DIR='${EC2_APP_DIR}' APP_IMAGE='${APP_IMAGE}' REPOSITORY_URL='${REPOSITORY_URL}' bash -s" <<'REMOTE'
+            "$remote_env bash -s" <<'REMOTE'
           set -euo pipefail
 
           if [ ! -d "$EC2_APP_DIR/.git" ]; then
@@ -85,13 +96,21 @@ jobs:
           git fetch origin main
           git checkout -B main origin/main
 
-          if [ ! -f .env ]; then
-            echo ".env 파일이 없습니다. $EC2_APP_DIR/.env 파일을 먼저 생성하세요."
-            exit 1
-          fi
+          sudo env \
+            "APP_IMAGE=$APP_IMAGE" \
+            "MYSQL_USER=$MYSQL_USER" \
+            "MYSQL_PASSWORD=$MYSQL_PASSWORD" \
+            "MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD" \
+            "SHORTLINKOPS_BASE_URL=$SHORTLINKOPS_BASE_URL" \
+            docker compose -f docker-compose.prod.yml pull
 
-          sudo env "APP_IMAGE=$APP_IMAGE" docker compose -f docker-compose.prod.yml pull
-          sudo env "APP_IMAGE=$APP_IMAGE" docker compose -f docker-compose.prod.yml up -d --remove-orphans
+          sudo env \
+            "APP_IMAGE=$APP_IMAGE" \
+            "MYSQL_USER=$MYSQL_USER" \
+            "MYSQL_PASSWORD=$MYSQL_PASSWORD" \
+            "MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD" \
+            "SHORTLINKOPS_BASE_URL=$SHORTLINKOPS_BASE_URL" \
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
           for attempt in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:8081/actuator/health >/dev/null; then
