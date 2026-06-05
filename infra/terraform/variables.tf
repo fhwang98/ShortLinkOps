@@ -25,7 +25,7 @@ variable "domain_name" {
 variable "instance_type" {
   description = "EC2 인스턴스 유형입니다."
   type        = string
-  default     = "t3.micro"
+  default     = "t3.small"
 }
 
 variable "key_pair_name" {

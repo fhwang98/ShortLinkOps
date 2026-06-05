@@ -9,7 +9,7 @@
 - DNS Record: `fhwang.cloud`, `www.fhwang.cloud` A 레코드
 - Public IP: Elastic IP
 - AMI: Ubuntu 24.04 LTS x86_64
-- Instance Type: `t3.micro`
+- Instance Type: `t3.small`
 - Root Volume: 30GiB gp3 encrypted
 - Security Group: 신규 생성
 - Key Pair: Terraform에서 신규 생성
@@ -78,7 +78,7 @@ https://www.fhwang.cloud
 
 Ubuntu AMI는 Canonical이 제공하는 AWS SSM Parameter Store의 최신 24.04 LTS x86_64 AMI ID를 사용합니다.
 
-기본 인스턴스 유형은 `t3.micro`입니다. dev 배포와 Free Tier 사용을 기준으로 설정했습니다. Spring Boot, MySQL, Redis, Nginx를 한 인스턴스에서 모두 실행하므로 메모리 부족이 발생하면 `terraform.tfvars`에서 `instance_type = "t3.small"`로 변경합니다.
+기본 인스턴스 유형은 `t3.small`입니다. Spring Boot, MySQL, Redis, Nginx를 한 인스턴스에서 모두 실행하므로 `t3.micro`는 메모리 부족이 발생할 수 있습니다.
 
 루트 볼륨은 30GiB gp3입니다. Docker 이미지, Gradle 빌드 산출물, MySQL 데이터 볼륨, 로그 저장 공간을 고려한 기본값입니다.
 
@@ -190,7 +190,7 @@ aws_region       = "ap-northeast-2"
 project_name     = "shortlinkops"
 environment      = "dev"
 domain_name      = "fhwang.cloud"
-instance_type    = "t3.micro"
+instance_type    = "t3.small"
 key_pair_name    = "shortlinkops-key"
 private_key_file = "generated/shortlinkops-key.pem"
 ssh_allowed_cidr = "0.0.0.0/0"
