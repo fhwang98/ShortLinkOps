@@ -18,12 +18,13 @@ class ActuatorHealthTest {
     private MockMvc mockMvc;
 
     @Test
-    void healthEndpointDoesNotExposeDetails() throws Exception {
+    void healthEndpointExposesDetailsForInternalAccess() throws Exception {
         mockMvc.perform(get("/actuator/health"))
                 .andExpect(result -> assertThat(result.getResponse().getStatus()).isIn(200, 503))
                 .andExpect(jsonPath("$.status").exists())
-                .andExpect(jsonPath("$.components").doesNotExist())
-                .andExpect(jsonPath("$.details").doesNotExist())
-                .andExpect(jsonPath("$.groups").doesNotExist());
+                .andExpect(jsonPath("$.components").exists())
+                .andExpect(jsonPath("$.components.db.status").exists())
+                .andExpect(jsonPath("$.components.diskSpace.details").exists())
+                .andExpect(jsonPath("$.groups").exists());
     }
 }
