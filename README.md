@@ -107,7 +107,7 @@ Spring Boot Container :8080
   +--> Redis Container :6379
 ```
 
-외부에는 EC2 호스트 Nginx의 80, 443 포트만 노출합니다. Spring Boot 컨테이너는 EC2 내부의 `127.0.0.1:8081`에서만 접근하고, MySQL과 Redis는 Docker 내부 네트워크에서만 접근하도록 구성합니다.
+외부에는 EC2 호스트 Nginx의 80, 443 포트만 노출합니다. Spring Boot 컨테이너는 EC2 내부의 `127.0.0.1:8081`에서만 접근하고, MySQL과 Redis는 Docker 내부 네트워크에서만 접근하도록 구성합니다. 운영 환경의 `/actuator` 경로는 Nginx에서 외부 접근을 차단합니다.
 
 ## 6. URL 설계
 
@@ -127,7 +127,6 @@ Spring Boot Container :8080
 | POST | `/api/links` | 단축 URL 생성 |
 | GET | `/api/links/{shortCode}` | 단축 URL 상세 조회 |
 | GET | `/api/links/{shortCode}/stats` | 클릭 수 조회 |
-| GET | `/actuator/health` | 애플리케이션 상태 확인 |
 
 ## 7. DB 설계
 
@@ -374,7 +373,7 @@ docker compose up -d --build
 
 ```bash
 docker compose ps
-curl https://www.fhwang.cloud/actuator/health
+curl http://127.0.0.1:8081/actuator/health
 ```
 
 브라우저에서 다음 주소로 접속해 URL 생성, 상세 조회, 리다이렉트, 클릭 수 증가를 확인합니다.
@@ -445,7 +444,7 @@ v1.0.0 릴리스 전 아래 항목을 확인합니다.
 
 - `dev` 브랜치 CI 통과
 - EC2 운영 배포 성공
-- `https://www.fhwang.cloud/actuator/health` 응답 확인
+- EC2 내부 `http://127.0.0.1:8081/actuator/health` 응답 확인
 - 단축 URL 생성, 조회, 리다이렉트 동작 확인
 - Route53 A 레코드와 HTTPS 리다이렉트 확인
 - `main` 병합 전 민감 정보 미포함 확인
