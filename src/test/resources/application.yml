@@ -18,5 +18,16 @@ mybatis:
 server:
   forward-headers-strategy: framework
 
+management:
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+      probes:
+        enabled: true
+  health:
+    redis:
+      enabled: false
+
 shortlinkops:
   base-url: "http://localhost:8080"
