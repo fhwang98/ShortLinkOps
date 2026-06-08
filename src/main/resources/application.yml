@@ -32,8 +32,8 @@ management:
         include: health,info
   endpoint:
     health:
-      show-details: never
-      show-components: never
+      show-details: always
+      show-components: always
       probes:
         enabled: true
   health:
