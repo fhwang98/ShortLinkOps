@@ -34,6 +34,11 @@ server {
         root /var/www/html;
     }
 
+    # 외부에서는 Actuator 엔드포인트를 노출하지 않습니다.
+    location ^~ /actuator {
+        return 404;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:${app_upstream_port};
         proxy_set_header Host $host;

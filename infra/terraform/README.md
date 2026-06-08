@@ -50,7 +50,7 @@ Terraform 적용 후 `hosted_zone_name_servers` 출력값을 도메인 등록기
 
 ## HTTPS
 
-EC2 `user_data`는 호스트 OS에 Nginx와 Certbot을 설치합니다. 호스트 Nginx는 외부 80, 443 요청을 받고 Spring Boot 컨테이너의 `127.0.0.1:8081`로 프록시합니다.
+EC2 `user_data`는 호스트 OS에 Nginx와 Certbot을 설치합니다. 호스트 Nginx는 외부 80, 443 요청을 받고 Spring Boot 컨테이너의 `127.0.0.1:8081`로 프록시합니다. 운영 환경의 `/actuator` 경로는 외부에서 접근할 수 없도록 Nginx에서 차단합니다.
 
 Let's Encrypt 인증서 발급은 DNS 전파가 끝나야 성공합니다. 이를 위해 `shortlinkops-certbot.timer`가 DNS A 레코드가 Elastic IP를 바라볼 때까지 10분 간격으로 재시도합니다.
 
