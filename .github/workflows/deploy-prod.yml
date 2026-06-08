@@ -96,6 +96,8 @@ jobs:
           git fetch origin main
           git checkout -B main origin/main
 
+          sudo bash scripts/deploy/block-actuator-in-nginx.sh
+
           sudo env \
             "APP_IMAGE=$APP_IMAGE" \
             "MYSQL_USER=$MYSQL_USER" \
